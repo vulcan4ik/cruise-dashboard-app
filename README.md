@@ -22,9 +22,8 @@
 
 - **Backend**: Python 3.12, Flask
 - **Data Processing**: Pandas, NumPy
-- **API Integration**: ЦБ РФ XML APIgit remote add origin https://github.com/ВАШ-USERNAME/cruise-analytics-dashboard.git
 - **Frontend**: HTML5, CSS3, JavaScript
-- **Deployment**: PythonAnywhere
+- **Deployment**: PythonAnywhere.com
 - **Dashboard**: Yandex Datalens
 
 ## Установка и запуск
