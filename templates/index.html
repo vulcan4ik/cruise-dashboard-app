@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка отчета продаж</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        /* Информация о курсах */
+        .currency-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+        }
+
+        .currency-info.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .currency-info.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .currency-info.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .currency-info-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        .currency-info-details {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .currency-info-details p {
+            margin: 3px 0;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            margin: 20px 0;
+        }
+
+        .file-input input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-choose {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-choose:hover {
+            background: #5a6268;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-info {
+            text-align: center;
+            color: #666;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        .alerts {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .supported-formats {
+            text-align: center;
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Загрузка отчета</h1>
+            <p>Загрузите отчет для автоматической обработки и визуализации</p>
+        </div>
+
+        <!-- Статус курсов валют -->
+        {% if currency_info %}
+        <div class="currency-info {{ currency_info.class }}">
+            <div class="currency-info-header">
+                <span>💱 Курсы валют ЦБ РФ:</span>
+                <span>{{ currency_info.message }}</span>
+            </div>
+            <div class="currency-info-details">
+                {% if currency_info.min_date %}
+                <p><strong>Период:</strong> {{ currency_info.min_date }} — {{ currency_info.max_date }}</p>
+                <p><strong>Записей:</strong> {{ currency_info.total_records }}</p>
+                {% if currency_info.days_old is defined %}
+                <p><strong>Последнее обновление:</strong> {{ currency_info.days_old }} дн. назад</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Сообщения об ошибках -->
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alerts">
+            {% for message in messages %}
+            <div class="alert alert-error">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Форма загрузки -->
+        <form method="POST" action="/upload" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-area" id="dropZone">
+                <div class="upload-icon">📁</div>
+                <p style="font-size: 1.2em; margin-bottom: 10px; color: #333;">Перетащите файл или нажмите для выбора</p>
+                <div class="file-input">
+                    <label for="fileInput" class="btn btn-choose">Выбрать файл</label>
+                    <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" required>
+                </div>
+                <div class="file-info" id="fileInfo">Файл не выбран</div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn" disabled>
+                📤 Загрузить и обработать
+            </button>
+        </form>
+
+        <div class="supported-formats">
+            Поддерживаемые форматы: .xlsx, .xls, .csv
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+
+        // Обработка выбора файла
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileInfo.textContent = `Выбран файл: ${file.name}`;
+                fileInfo.style.color = '#28a745';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Drag and Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                const file = files[0];
+                fileInfo.textContent = `Выбран файл: ${file.name}`;
+                fileInfo.style.color = '#28a745';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Клик на dropZone открывает выбор файла (но НЕ на кнопку submit)
+        dropZone.addEventListener('click', function(e) {
+            // Игнорируем клик по кнопке submit и кнопке "Выбрать файл"
+            if (e.target.id === 'submitBtn' || 
+                e.target.closest('#submitBtn') || 
+                e.target.classList.contains('btn-choose') ||
+                e.target.closest('.btn-choose')) {
+                return;
+            }
+            fileInput.click();
+        });
+
+        // Показываем индикатор загрузки при отправке формы
+        uploadForm.addEventListener('submit', function(e) {
+            submitBtn.textContent = '⏳ Обработка...';
+            submitBtn.disabled = true;
+        });
+    </script>
+</body>
+
+</html>
