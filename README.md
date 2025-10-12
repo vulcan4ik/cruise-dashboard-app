@@ -37,21 +37,36 @@
 - https://vulcan4ik.pythonanywhere.com/
 
 ### Локальная установка
+#### 📂 Структура проекта
+
+```
 dashboard-cruise-app/
-├── README.md                          ← Описание проекта
-├── requirements.txt                   ← Зависимости Python
-├── .gitignore                         ← Что не загружать в Git
-├── app.py                             ← Главный файл Flask
-├── processsing.py                     ← Обработка данных
-├── currency_updater.py                ← Обновление курсов валют
-├── templates/
-│   ├── index.html                     ← Главная страница
-│   └── success.html                   ← Страница успеха
-├── sample_data/                       ← Примеры данных (данные сгенерированы произвольно)
-│   ├── sample_input.xlsx              ← Пример входного файла
-│   └── sample_output.csv              ← Пример результата
-└── docs/
-    └── DEPLOYMENT.md                  ← Инструкция по деплою
+│
+├── 📄 README.md                       # Описание проекта
+├── 📄 requirements.txt                # Зависимости Python
+├── 📄 .gitignore                      # Исключения для Git
+│
+├── 🐍 app.py                          # Главный файл Flask приложения
+├── 🐍 processsing.py                  # Обработка и очистка данных
+├── 🐍 currency_updater.py             # Обновление курсов валют 
+│
+├── 📁 templates/                      # HTML шаблоны
+│   ├── index.html                     # Главная страница с загрузкой файлов
+│   └── success.html                   # Страница успешной обработки
+│
+├── 📁 sample_data/                    # Примеры данных (обезличенные)
+│   ├── sample_input.xlsx              # Пример входного файла
+│   └── sample_output.csv              # Пример обработанного файла
+│
+├── 📁 app_data/
+│   └── currency_rates_2024-2025.csv   # Курсы валют ЦБ РФ (2024-2025)
+│
+├── 📁 uploads/                        # Временное хранение загруженных файлов
+├── 📁 results/                        # Обработанные файлы для скачивания
+│
+└── 📁 docs/
+    └── DEPLOYMENT.md                  # Инструкция по развертыванию
+```
 
 1. Клонируйте репозиторий:
 git clone https://github.com/vulcan4ik/cruise-dashboard-app.git
