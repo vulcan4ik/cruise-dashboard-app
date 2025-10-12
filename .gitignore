@@ -10,7 +10,6 @@ uploads/*
 !uploads/.gitkeep
 results/*
 !results/.gitkeep
-app_data/
 
 # Credentials
 credentials.json

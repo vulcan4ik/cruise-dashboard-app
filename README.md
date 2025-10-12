@@ -1,4 +1,4 @@
-# 🌊🚢dashboard-cruise-app
+# 🌊🚢cruise-dashboard-app
 
 ## web - версия:  https://vulcan4ik.pythonanywhere.com/
 
@@ -22,7 +22,7 @@
 
 - **Backend**: Python 3.12, Flask
 - **Data Processing**: Pandas, NumPy
-- **API Integration**: ЦБ РФ XML API
+- **API Integration**: ЦБ РФ XML APIgit remote add origin https://github.com/ВАШ-USERNAME/cruise-analytics-dashboard.git
 - **Frontend**: HTML5, CSS3, JavaScript
 - **Deployment**: PythonAnywhere
 - **Dashboard**: Yandex Datalens
@@ -54,7 +54,7 @@ dashboard-cruise-app/
     └── DEPLOYMENT.md                  ← Инструкция по деплою
 
 1. Клонируйте репозиторий:
-git clone https://github.com/vulcan4ik/dashboard-cruise-app.git
+git clone https://github.com/vulcan4ik/cruise-dashboard-app.git
 cd dashboard-cruise-app
 
 2. Создайте виртуальное окружение:
