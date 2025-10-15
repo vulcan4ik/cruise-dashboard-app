@@ -404,7 +404,10 @@ def enrich_data(df):
         df['days_until_checkin'] = df['days_until_checkin'].fillna(0)
 
     if 'country' in df.columns:
-        df['is_cruise_seller'] = df['country'].apply(lambda x: 1 if str(x) == 'Kруиз' else 0)
+
+        cruise_agents = df.loc[df['country'].astype(str).str.lower().str.contains('круиз'), 'buyer_name'].unique()
+
+        df['is_cruise_seller'] = df['buyer_name'].apply(lambda x: 1 if x in cruise_agents else 0)
 
     if 'creation_date' in df.columns:
         df['creation_month'] = df['creation_date'].dt.month
