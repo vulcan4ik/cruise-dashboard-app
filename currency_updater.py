@@ -7,180 +7,175 @@ import time
 from xml.etree import ElementTree as ET
 import os
 
-def get_cbr_rate(date, currency_code):
-    """Получение курса ЦБ на определенную дату"""
+# Пути к данным и логам
+RATES_FILE = '/home/vulcan4ik/dashboard-cruise-app/app_data/currency_rates_2024-2025.csv'
+LOG_FILE = '/home/vulcan4ik/dashboard-cruise-app/app_data/currency_updater.log'
+
+
+def log_message(message):
+    """Запись сообщений в лог-файл"""
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    with open(LOG_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {message}\n")
+    print(message)
+
+
+def get_cbr_rates_for_date(date):
+    """Получение курсов ЦБ за один день (USD и EUR одним запросом)"""
     url = "http://www.cbr.ru/scripts/XML_daily.asp"
     params = {'date_req': date.strftime('%d/%m/%Y')}
+    rates = {}
 
     try:
         response = requests.get(url, params=params, timeout=10)
-        if response.status_code == 200:
-            root = ET.fromstring(response.content)
-            for valute in root.findall('Valute'):
-                if valute.find('CharCode').text == currency_code:
-                    value = valute.find('Value').text
-                    return float(value.replace(',', '.'))
-    except Exception as e:
-        print(f"Ошибка получения курса {currency_code} на {date}: {e}")
+        response.raise_for_status()
+        root = ET.fromstring(response.content)
 
-    return None
+        for valute in root.findall('Valute'):
+            code = valute.find('CharCode').text
+            if code in ('USD', 'EUR'):
+                value = float(valute.find('Value').text.replace(',', '.'))
+                rates[code] = value
+
+    except Exception as e:
+        log_message(f"❌ Ошибка получения курсов на {date.strftime('%d.%m.%Y')}: {e}")
+        return None
+
+    return rates if len(rates) == 2 else None
+
+
+def is_rates_file_fresh(rates_file):
+    """Проверяет, актуален ли файл курсов (до вчерашнего дня)"""
+    if not os.path.exists(rates_file):
+        return False
+
+    try:
+        df = pd.read_csv(rates_file)
+        df['date'] = pd.to_datetime(df['date'])
+        last_date = df['date'].max().date()
+        yesterday = (datetime.now() - timedelta(days=1)).date()
+        return last_date >= yesterday
+    except Exception:
+        return False
 
 
 def download_cbr_rates_full(start_date='2024-01-01', end_date=None):
     """Полная загрузка курсов ЦБ РФ за период"""
 
-    # ИСПРАВЛЕНИЕ: если end_date не указан, используем вчерашний день
     if end_date is None:
         end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
     dates = pd.date_range(start=start_date, end=end_date, freq='D')
     rates_data = []
 
-    print(f"⏳ Загрузка курсов ЦБ РФ за период {start_date} - {end_date}...")
+    log_message(f"⏳ Загрузка курсов ЦБ РФ за период {start_date} - {end_date}...")
 
     for i, date in enumerate(dates):
         if i % 50 == 0:
-            print(f"Обработано {i}/{len(dates)} дат...")
+            log_message(f"📆 Обработано {i}/{len(dates)} дат...")
 
-        usd_rate = get_cbr_rate(date, 'USD')
-        eur_rate = get_cbr_rate(date, 'EUR')
-
-        if usd_rate and eur_rate:
-            rates_data.append({
-                'date': date,
-                'USD': usd_rate,
-                'EUR': eur_rate
-            })
-
-        time.sleep(0.2)  # Пауза чтобы не нагружать API ЦБ
+        rates = get_cbr_rates_for_date(date)
+        if rates:
+            rates_data.append({'date': date, 'USD': rates['USD'], 'EUR': rates['EUR']})
+        else:
+            log_message(f"⚠️ Пропущена дата {date.strftime('%d.%m.%Y')} (нет данных)")
+        time.sleep(0.2)
 
     df_currency_rate = pd.DataFrame(rates_data)
 
     if not df_currency_rate.empty:
-        filename = '/home/vulcan4ik/dashboard-cruise-app/app_data/currency_rates_2024-2025.csv'
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        df_currency_rate.to_csv(filename, index=False)
-
-        print(f"✅ Реальные курсы сохранены в: {filename}")
-        print(f"📊 Загружено {len(df_currency_rate)} записей")
-        print(f"📅 Период: {df_currency_rate['date'].min()} - {df_currency_rate['date'].max()}")
-
+        os.makedirs(os.path.dirname(RATES_FILE), exist_ok=True)
+        df_currency_rate.to_csv(RATES_FILE, index=False)
+        log_message(f"✅ Курсы сохранены в: {RATES_FILE}")
+        log_message(f"📊 Загружено {len(df_currency_rate)} записей")
         return df_currency_rate
     else:
-        print("❌ Не удалось загрузить данные")
+        log_message("❌ Не удалось загрузить данные")
         return None
 
 
-def update_exchange_rates(rates_file='/home/vulcan4ik/dashboard-cruise-app/app_data/currency_rates_2024-2025.csv'):
-    """Дозагружает курсы за недостающий период с детальным статусом"""
+def update_exchange_rates(rates_file=RATES_FILE):
+    """Дозагружает курсы за недостающий период и сохраняет"""
 
+    #  Проверка наличия файла
+    if not os.path.exists(rates_file):
+        log_message("⚠️ Файл курсов не найден. Загружаем всё с нуля...")
+        df = download_cbr_rates_full()
+        if df is not None:
+            return {
+                'status': 'success',
+                'message': f'Курсы загружены до {df["date"].max().strftime("%d.%m.%Y")}',
+                'data': df
+            }
+        return {'status': 'error', 'message': 'Не удалось загрузить курсы', 'data': None}
+
+    #  Проверка актуальности файла
+    if is_rates_file_fresh(rates_file):
+        existing_df = pd.read_csv(rates_file)
+        existing_df['date'] = pd.to_datetime(existing_df['date'])
+        last_date = existing_df['date'].max()
+        return {
+            'status': 'up_to_date',
+            'message': f'Курсы валют актуальны на {last_date.strftime("%d.%m.%Y")}',
+            'data': existing_df
+        }
+
+    #  Дозагрузка недостающих данных
     try:
         existing_df = pd.read_csv(rates_file)
         existing_df['date'] = pd.to_datetime(existing_df['date'])
-        print(f"✅ Загружено существующих записей: {len(existing_df)}")
+        last_date = existing_df['date'].max().date()
+        yesterday = (datetime.now() - timedelta(days=1)).date()
 
-    except FileNotFoundError:
-        print("❌ Файл курсов не найден. Создаем новый...")
-        result = download_cbr_rates_full()
+        start_date = last_date + timedelta(days=1)
+        end_date = yesterday
+        dates_to_download = pd.date_range(start=start_date, end=end_date, freq='D')
 
-        if result is not None:
-            return {
-                'status': 'success',
-                'message': f'Курсы валют успешно загружены на дату: {result["date"].max().strftime("%d.%m.%Y")}',
-                'data': result
-            }
-        else:
-            return {
-                'status': 'error',
-                'message': 'Не удалось загрузить курсы валют. Конвертация будет недоступна.',
-                'data': None
-            }
+        log_message(f" Дозагрузка {len(dates_to_download)} дней: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}")
 
-    except Exception as e:
-        return {
-            'status': 'error',
-            'message': f'Ошибка загрузки файла курсов: {e}. Конвертация будет недоступна.',
-            'data': None
-        }
+        new_rates_data = []
 
-    last_date = existing_df['date'].max()
-    current_date = datetime.now().date()
-    yesterday = (datetime.now() - timedelta(days=1)).date()
-    last_date_only = last_date.date()
+        for i, date in enumerate(dates_to_download):
+            rates = get_cbr_rates_for_date(date)
+            if rates:
+                new_rates_data.append({'date': date, 'USD': rates['USD'], 'EUR': rates['EUR']})
+            else:
+                log_message(f"⚠️ Пропущена дата {date.strftime('%d.%m.%Y')}")
+            time.sleep(0.2)
 
-    print(f"📅 Последняя дата в файле: {last_date.strftime('%d.%m.%Y')}")
-    print(f"📅 Текущая дата: {current_date.strftime('%d.%m.%Y')}")
-
-    # ИСПРАВЛЕНИЕ: проверяем актуальность до вчерашнего дня
-    # (сегодняшние курсы могут быть еще не опубликованы)
-    if last_date_only >= yesterday:
-        return {
-            'status': 'up_to_date',
-            'message': f'Курсы валют актуальны на дату: {last_date.strftime("%d.%m.%Y")}',
-            'data': existing_df
-        }
-
-    # Нужно дозагрузить - ИСПРАВЛЕНИЕ: только до вчера
-    start_date = last_date + timedelta(days=1)
-    end_date = datetime.now() - timedelta(days=1)  # До вчера, не до сегодня
-
-    dates_to_download = pd.date_range(start=start_date, end=end_date, freq='D')
-
-    print(f"📥 Попытка дозагрузки {len(dates_to_download)} дней: {start_date.strftime('%d.%m.%Y')} - {end_date.strftime('%d.%m.%Y')}")
-
-    new_rates_data = []
-
-    for i, date in enumerate(dates_to_download):
-        if i % 20 == 0:
-            print(f"⏳ Дозагружено {i}/{len(dates_to_download)}...")
-
-        usd_rate = get_cbr_rate(date, 'USD')
-        eur_rate = get_cbr_rate(date, 'EUR')
-
-        if usd_rate and eur_rate:
-            new_rates_data.append({
-                'date': date,
-                'USD': usd_rate,
-                'EUR': eur_rate
-            })
-
-        time.sleep(0.2)
-
-    # Если удалось загрузить новые данные
-    if new_rates_data:
-        new_df = pd.DataFrame(new_rates_data)
-        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-
-        try:
+        if new_rates_data:
+            new_df = pd.DataFrame(new_rates_data)
+            updated_df = pd.concat([existing_df, new_df], ignore_index=True)
             updated_df.to_csv(rates_file, index=False)
             latest_date = updated_df['date'].max()
-
-            print(f"✅ Файл обновлен!")
-            print(f"📈 Добавлено новых записей: {len(new_df)}")
-            print(f"📊 Всего записей: {len(updated_df)}")
-
+            log_message(f"✅ Файл обновлён! Добавлено {len(new_df)} новых записей.")
             return {
                 'status': 'success',
-                'message': f'Курсы валют обновлены на дату: {latest_date.strftime("%d.%m.%Y")}',
+                'message': f'Курсы валют обновлены до {latest_date.strftime("%d.%m.%Y")}',
                 'data': updated_df
             }
 
-        except Exception as e:
+        else:
             return {
-                'status': 'error',
-                'message': f'Не удалось сохранить обновленные курсы. Расчеты будут использовать данные на {last_date.strftime("%d.%m.%Y")}',
+                'status': 'partial',
+                'message': f'Нет новых данных. Используются курсы на {last_date.strftime("%d.%m.%Y")}',
                 'data': existing_df
             }
 
-    else:
-        # Не удалось загрузить новые данные
-        return {
-            'status': 'partial',
-            'message': f'Не удалось обновить курсы валют. Расчеты будут использовать последние доступные данные на {last_date.strftime("%d.%m.%Y")}',
-            'data': existing_df
-        }
+    except Exception as e:
+        log_message(f"❌ Ошибка при обновлении: {e}")
+        return {'status': 'error', 'message': f'Ошибка обновления: {e}', 'data': None}
 
 
+# 🔁 Автоматический запуск при выполнении скрипта
 if __name__ == "__main__":
-    update_exchange_rates()
+    print("🚀 Запуск обновления курсов валют...")
+    result = update_exchange_rates()
+
+    if result["status"] in ("success", "up_to_date"):
+        print(f"✅ {result['message']}")
+    else:
+        print(f"⚠️ {result['message']}")
+
+  
 
