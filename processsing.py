@@ -131,17 +131,14 @@ def process_data(file_path):
     else:
         df = pd.read_excel(file_path)
 
-    # ПЕРВЫМ ДЕЛОМ - переименовываем столбцы
-    df = rename_columns(df)
 
-    # Затем очищаем числовые данные
-    df = clean_numeric_data(df)
-
-    # Ваш существующий код обработки
-    df = clean_data(df)  # Сначала очищаем данные
-    df = generate_amount_data(df)  # Потом генерируем суммы
-    df = generate_payment_data(df)
-    df = enrich_data(df)
+    df = rename_columns(df)         #  Переименовываем столбцы
+    df = clean_numeric_data(df)     #  Очищаем числовые данные
+    df = clean_data(df)             #  Удаляем ненужные строки
+    df = fill_missing_buyer_names(df)  # Заполняем пропуски в названии агентств
+    df = generate_amount_data(df)   #  Генерируем пропущенные суммы
+    df = generate_payment_data(df)  #  Генерируем оплаты
+    df = enrich_data(df)            #  Обогащаем данными
 
     return df
 
@@ -166,8 +163,8 @@ def rename_columns(df):
         'Создатель': 'creator',
         'Ведущий менеджер': 'manager'
     }
-
-    # Просто переименовываем - pandas автоматически игнорирует отсутствующие столбцы
+    
+    # переименовываем - pandas автоматически игнорирует отсутствующие столбцы
     df = df.rename(columns=rename_dict)
 
     # Оставляем только столбцы из словаря (те которые существуют после переименования)
@@ -183,18 +180,24 @@ def rename_columns(df):
 
 
 def clean_data(df):
-
     """Очистка данных"""
-
-    print(f"🔍 Исходный размер данных: {df.shape}")
+    print(f" Исходный размер данных: {df.shape}")
+    
+    # Проверка наличия обязательных столбцов
+    required_columns = ['voucher_id', 'voucher_status']
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        print(f"⚠️ ВНИМАНИЕ: Отсутствуют обязательные столбцы: {missing_cols}")
+        return df
+    
     # Удаляем строки с удаленными/аннулированными путевками
-    df = df[~df['voucher_status'].isin(['Удален', 'Аннулирован'])]
-    print(f"🔍 Размер данных после удаления аннулированных/удаленных: {df.shape}")
-
-     # Удаляем строки с пустым voucher_id (включая последние строки)
+    if 'voucher_status' in df.columns:
+        df = df[~df['voucher_status'].isin(['Удален', 'Аннулирован', 'удален','аннулирован'])]
+        print(f"🔍 Размер данных после удаления аннулированных/удаленных: {df.shape}")
+    
+    # Удаляем строки с пустым voucher_id
     if 'voucher_id' in df.columns:
         initial_count = len(df)
-        # Создаем маску для непустых voucher_id
         non_empty_mask = (
             df['voucher_id'].notna() &
             (df['voucher_id'] != '') &
@@ -204,7 +207,16 @@ def clean_data(df):
         removed_count = initial_count - len(df)
         if removed_count > 0:
             print(f"🗑️ Удалено строк с пустым voucher_id: {removed_count}")
-
+    
+    # НОВОЕ: Проверяем пропуски в важных полях
+    important_fields = ['buyer_department', 'buyer_name', 'manager']
+    for field in important_fields:
+        if field in df.columns:
+            missing_count = df[field].isna().sum()
+            empty_count = (df[field] == '').sum()
+            if missing_count > 0 or empty_count > 0:
+                print(f"⚠️ Поле '{field}': {missing_count} NaN, {empty_count} пустых строк")
+    
     print(f"📊 Итоговый размер данных: {df.shape}")
     return df
     # Заполняем пропуски
@@ -373,6 +385,36 @@ def extract_region(agency_name):
                 return last_part.strip()
 
     return 'Другой'
+
+def fill_missing_buyer_names(df):
+    """Заполняет пропуски в buyer_name: КЛИЕНТСКИЙ ЗАЛ или 'Не определен'"""
+    
+    # Проверяем наличие столбцов
+    if 'buyer_department' not in df.columns or 'buyer_name' not in df.columns:
+        return df
+    
+    #  Сначала заполняем КЛИЕНТСКИЙ ЗАЛ
+    mask_client_hall = (
+        (df['buyer_department'] == 'КЛИЕНТСКИЙ ЗАЛ') & 
+        (df['buyer_name'].isna() | (df['buyer_name'] == ''))
+    )
+    count_client_hall = mask_client_hall.sum()
+    df.loc[mask_client_hall, 'buyer_name'] = 'КЛИЕНТСКИЙ ЗАЛ'
+    
+    # Затем заполняем остальные пропуски
+    mask_other = df['buyer_name'].isna() | (df['buyer_name'] == '')
+    count_other = mask_other.sum()
+    df.loc[mask_other, 'buyer_name'] = 'Не определен'
+    
+    # статистика
+    if count_client_hall > 0:
+        print(f" Заполнено 'КЛИЕНТСКИЙ ЗАЛ': {count_client_hall} записей")
+    if count_other > 0:
+        print(f" Заполнено 'Не определен': {count_other} записей")
+    if count_client_hall == 0 and count_other == 0:
+        print(" Пропусков в buyer_name не найдено")
+    
+    return df
 
 
 
