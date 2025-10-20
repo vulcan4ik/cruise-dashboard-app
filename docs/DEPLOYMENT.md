@@ -79,9 +79,9 @@ if project_path not in sys.path:
     sys.path.insert(0, project_path)
 
 # Путь к virtualenv
-activate_this = os.path.join(project_home, 'venv/bin/activate_this.py')
+activate_this = os.path.join(project_path, 'venv/bin/activate_this.py')
 with open(activate_this) as file_:
-exec(file_.read(), dict(file=activate_this))
+    exec(file_.read(), dict(__file__=activate_this))
 
 #  Меняем рабочую директорию
 os.chdir(project_path)
@@ -108,6 +108,9 @@ application.debug = False
 /home/ваш-username/cruise-dashboard-app/venv
 
 2. **Working directory:** укажи путь к проекту:
+
+/home/ваш-username/cruise-dashboard-app
+
 ##  Шаг 5: Создание необходимых папок
 В Bash консоли:
 ```
