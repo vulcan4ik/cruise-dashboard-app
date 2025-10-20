@@ -3,6 +3,8 @@
 ## 🌐 **Web - версия:** [vulcan4ik.pythonanywhere.com](https://vulcan4ik.pythonanywhere.com/)
 ## 📊 **Dashboard в Yandex DataLens:** ([перейти](https://datalens.ru/z699juka5120k))
 
+
+
 # 🚢 Cruise Sales Analytics Dashboard
 
 Веб-приложение для автоматической обработки отчетов о продажах круизов. Очищает данные, конвертирует валюты по курсу ЦБ РФ и готовит аналитические метрики для дашборда в Yandex DataLens.
@@ -113,7 +115,7 @@ dashboard-cruise-app/
 │
 └── 📁 docs/
     └── DEPLOYMENT.md                   # Инструкция по развертыванию
-    └── images/ # Скриншоты для README                 
+    └── images/ # Скриншоты для README  # Скриншоты для README               
 ```
 
 1. Клонируйте репозиторий:
@@ -157,5 +159,5 @@ python app.py
 Alexey Kharchenko, junior Data Analyst
 - GitHub: [@vulcan4ik](https://github.com/vulcan4ik)
 - tg: https://t.me/vulcan4ik
-
+- Email: vulcanxxx@yandex.ru  
 
