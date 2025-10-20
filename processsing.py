@@ -6,10 +6,32 @@ import os
 from datetime import datetime
 import re
 import numpy as np
-import random
+
 
 # Глобальная переменная для кэширования курсов
 _CURRENCY_RATES_CACHE = None
+
+# Глобальная переменная для статистики обработки
+PROCESSING_STATS = {}
+
+
+def reset_stats():
+    """Сбрасывает статистику обработки"""
+    global PROCESSING_STATS
+    PROCESSING_STATS = {
+        'original_rows': 0,
+        'original_cols': 0,
+        'removed_duplicates': 0,
+        'removed_cancelled': 0,
+        'removed_empty_voucher': 0,
+        'filled_buyer_name_client_hall': 0,
+        'filled_buyer_name_undefined': 0,
+        'converted_currency': 0,
+        'extracted_regions': 0,
+        'final_rows': 0,
+        'final_cols': 0,
+        'added_cols': []
+    }
 
 
 def get_currency_rates(rates_file='/home/vulcan4ik/dashboard-cruise-app/app_data/currency_rates_2024-2025.csv'):
@@ -92,6 +114,7 @@ def convert_to_rub(row, rates_df):
         print(f"❌ Ошибка конвертации для строки: {e}")
         return 0
 
+
 def clean_numeric_data(df):
     """Очищает числовые данные от запятых и других нечисловых символов"""
 
@@ -121,9 +144,10 @@ def clean_numeric_data(df):
     return df
 
 
-
 def process_data(file_path):
     """Основная функция обработки данных"""
+    global PROCESSING_STATS
+    reset_stats()
 
     # Читаем файл
     if file_path.endswith('.csv'):
@@ -131,16 +155,32 @@ def process_data(file_path):
     else:
         df = pd.read_excel(file_path)
 
+    # Сохраняем исходную статистику
+    PROCESSING_STATS['original_rows'] = len(df)
+    PROCESSING_STATS['original_cols'] = len(df.columns)
 
-    df = rename_columns(df)         #  Переименовываем столбцы
-    df = clean_numeric_data(df)     #  Очищаем числовые данные
-    df = clean_data(df)             #  Удаляем ненужные строки
-    df = fill_missing_buyer_names(df)  # Заполняем пропуски в названии агентств
-    df = generate_amount_data(df)   #  Генерируем пропущенные суммы
-    df = generate_payment_data(df)  #  Генерируем оплаты
-    df = enrich_data(df)            #  Обогащаем данными
+    print(f"📂 Исходный файл: {len(df)} строк, {len(df.columns)} столбцов")
+
+    # ПЕРВЫМ ДЕЛОМ - переименовываем столбцы
+    df = rename_columns(df)
+
+    # Затем очищаем числовые данные
+    df = clean_numeric_data(df)
+
+    # Обработка данных (БЕЗ генерации)
+    df = clean_data(df)
+    df = fill_missing_buyer_names(df)
+    df = enrich_data(df)
+
+    # Финальная статистика
+    PROCESSING_STATS['final_rows'] = len(df)
+    PROCESSING_STATS['final_cols'] = len(df.columns)
+    PROCESSING_STATS['added_cols'] = ['amount_rub', 'region', 'is_cruise_seller', 'payment_percentage', 'days_until_checkin', 'creation_month']
+
+    print(f"✅ Обработка завершена: {len(df)} строк, {len(df.columns)} столбцов")
 
     return df
+
 
 def rename_columns(df):
     """Переименование столбцов согласно словарю"""
@@ -163,7 +203,7 @@ def rename_columns(df):
         'Создатель': 'creator',
         'Ведущий менеджер': 'manager'
     }
-    
+
     # переименовываем - pandas автоматически игнорирует отсутствующие столбцы
     df = df.rename(columns=rename_dict)
 
@@ -177,27 +217,22 @@ def rename_columns(df):
     return df
 
 
-
-
 def clean_data(df):
     """Очистка данных"""
-    print(f" Исходный размер данных: {df.shape}")
-    
-    # Проверка наличия обязательных столбцов
-    required_columns = ['voucher_id', 'voucher_status']
-    missing_cols = [col for col in required_columns if col not in df.columns]
-    if missing_cols:
-        print(f"⚠️ ВНИМАНИЕ: Отсутствуют обязательные столбцы: {missing_cols}")
-        return df
-    
+    global PROCESSING_STATS
+
+    print(f"🔍 Исходный размер данных: {df.shape}")
+
     # Удаляем строки с удаленными/аннулированными путевками
-    if 'voucher_status' in df.columns:
-        df = df[~df['voucher_status'].isin(['Удален', 'Аннулирован', 'удален','аннулирован'])]
-        print(f"🔍 Размер данных после удаления аннулированных/удаленных: {df.shape}")
-    
-    # Удаляем строки с пустым voucher_id
+    initial_count = len(df)
+    df = df[~df['voucher_status'].isin(['Удален', 'Аннулирован', 'удален', 'аннулирован'])]
+    PROCESSING_STATS['removed_cancelled'] = initial_count - len(df)
+    print(f"🔍 Размер данных после удаления аннулированных/удаленных: {df.shape}")
+
+    # Удаляем строки с пустым voucher_id (включая последние строки)
     if 'voucher_id' in df.columns:
         initial_count = len(df)
+        # Создаем маску для непустых voucher_id
         non_empty_mask = (
             df['voucher_id'].notna() &
             (df['voucher_id'] != '') &
@@ -205,87 +240,48 @@ def clean_data(df):
         )
         df = df[non_empty_mask]
         removed_count = initial_count - len(df)
+        PROCESSING_STATS['removed_empty_voucher'] = removed_count
         if removed_count > 0:
             print(f"🗑️ Удалено строк с пустым voucher_id: {removed_count}")
-    
-    # НОВОЕ: Проверяем пропуски в важных полях
-    important_fields = ['buyer_department', 'buyer_name', 'manager']
-    for field in important_fields:
-        if field in df.columns:
-            missing_count = df[field].isna().sum()
-            empty_count = (df[field] == '').sum()
-            if missing_count > 0 or empty_count > 0:
-                print(f"⚠️ Поле '{field}': {missing_count} NaN, {empty_count} пустых строк")
-    
+
     print(f"📊 Итоговый размер данных: {df.shape}")
     return df
-    # Заполняем пропуски
-    # df = df.fillna({
-    #      'amount_to_pay': 0,
-    #      'payment': 0,
-    #      'people': 1,
-    #      'days': 0
-    #  })
 
 
-# Генерируем правдоподобные данные для пропусков в суммах к оплате
-def generate_amount_data(df):
-    # Анализируем существующие данные для реалистичной генерации
-    if df['amount_to_pay'].notna().sum() > 0:
-        # Если есть реальные данные, используем их распределение
-        existing_amounts = df['amount_to_pay'].dropna()
-        mean_amount = existing_amounts.mean()
-        std_amount = existing_amounts.std()
+def fill_missing_buyer_names(df):
+    """Заполняет пропуски в buyer_name: КЛИЕНТСКИЙ ЗАЛ или 'Не определен'"""
+    global PROCESSING_STATS
 
-        # Генерируем данные на основе реального распределения
-        missing_mask = df['amount_to_pay'].isna()
-        n_missing = missing_mask.sum()
-        generated_amounts = np.random.normal(mean_amount, std_amount, n_missing)
+    # Проверяем наличие столбцов
+    if 'buyer_department' not in df.columns or 'buyer_name' not in df.columns:
+        return df
 
-        # Ограничиваем разумными значениями (не отрицательные, не слишком большие)
-        generated_amounts = np.clip(generated_amounts, 1000, 500000)
-        df.loc[missing_mask, 'amount_to_pay'] = generated_amounts.round(2)
-    else:
-        # Если нет реальных данных, генерируем на основе здравого смысла
-        missing_mask = df['amount_to_pay'].isna()
-        n_missing = missing_mask.sum()
+    # Сначала заполняем КЛИЕНТСКИЙ ЗАЛ
+    mask_client_hall = (
+        (df['buyer_department'] == 'КЛИЕНТСКИЙ ЗАЛ') &
+        (df['buyer_name'].isna() | (df['buyer_name'] == ''))
+    )
+    count_client_hall = mask_client_hall.sum()
+    df.loc[mask_client_hall, 'buyer_name'] = 'КЛИЕНТСКИЙ ЗАЛ'
+    PROCESSING_STATS['filled_buyer_name_client_hall'] = count_client_hall
 
-        # Генерируем суммы в зависимости от количества дней и людей
-        base_amounts = []
-        for idx in df[missing_mask].index:
-            days = df.loc[idx, 'days']
-            people = df.loc[idx, 'people']
-            if pd.notna(days) and pd.notna(people):
-                # Примерная логика: базовый тариф + стоимость за день и человека
-                base = 5000 + (days * people * 1500)
-                # Добавляем случайность
-                base *= random.uniform(0.8, 1.5)
-            else:
-                base = random.randint(10000, 200000)
-            base_amounts.append(base)
+    # Затем заполняем остальные пропуски
+    mask_other = df['buyer_name'].isna() | (df['buyer_name'] == '')
+    count_other = mask_other.sum()
+    df.loc[mask_other, 'buyer_name'] = 'Не определен'
+    PROCESSING_STATS['filled_buyer_name_undefined'] = count_other
 
-        df.loc[missing_mask, 'amount_to_pay'] = [round(x, 2) for x in base_amounts]
-
-    return df
-
-# Генерируем данные для оплаты на основе сумм к оплате
-def generate_payment_data(df):
-    missing_payment_mask = df['payment'].isna()
-
-    for idx in df[missing_payment_mask].index:
-        amount = df.loc[idx, 'amount_to_pay']
-        if pd.notna(amount):
-            # Оплата обычно немного меньше или равна сумме к оплате
-            # (могут быть скидки, частичные оплаты и т.д.)
-            payment = amount * random.uniform(0.7, 1.0)
-            df.loc[idx, 'payment'] = round(payment, 2)
-        else:
-            df.loc[idx, 'payment'] = round(random.uniform(5000, 150000), 2)
+    # Выводим статистику
+    if count_client_hall > 0:
+        print(f"✅ Заполнено 'КЛИЕНТСКИЙ ЗАЛ': {count_client_hall} записей")
+    if count_other > 0:
+        print(f"✅ Заполнено 'Не определен': {count_other} записей")
 
     return df
 
 
 def extract_region(agency_name):
+    """Извлекает регион из названия агентства"""
     if not isinstance(agency_name, str) or agency_name.strip() == '' or agency_name.lower() in ['n/a', 'nan', 'none']:
         return 'Не указано'
 
@@ -323,29 +319,6 @@ def extract_region(agency_name):
         'Ереван': ['ереван', 'yerevan'],
         'Баку': ['баку', 'baku'],
         'Алматы': ['алматы', 'almaty'],
-        'Омск': ['омск'],
-        'Уфа': ['уфа'],
-        'Волгоград': ['волгоград'],
-        'Кемерово': ['кемерово'],
-        'Орёл': ['орёл', 'орел'],
-        'Липецк': ['липецк'],
-        'Кострома': ['кострома'],
-        'Якутск': ['якутск', 'yakutsk'],
-        'Петрозаводск': ['петрозаводск'],
-        'Южно-Сахалинск': ['южно-сахалинск'],
-        'Химки': ['химки'],
-        'Чехов': ['чехов'],
-        'Одинцово': ['одинцово'],
-        'Лида': ['лида'],
-        'Владимир': ['владимир'],
-        'Александров': ['александров'],
-        'Старое Село': ['старое село'],
-        'Люберцы': ['люберцы'],
-        'Белгород': ['белгород'],
-        'Великий Новгород': ['великий новгород'],
-        'Мытищи': ['мытищи'],
-        'Абакан': ['абакан'],
-        'Оренбург': ['оренбург']
     }
 
     # Сначала ищем известные города в любом месте строки
@@ -386,56 +359,27 @@ def extract_region(agency_name):
 
     return 'Другой'
 
-def fill_missing_buyer_names(df):
-    """Заполняет пропуски в buyer_name: КЛИЕНТСКИЙ ЗАЛ или 'Не определен'"""
-    
-    # Проверяем наличие столбцов
-    if 'buyer_department' not in df.columns or 'buyer_name' not in df.columns:
-        return df
-    
-    #  Сначала заполняем КЛИЕНТСКИЙ ЗАЛ
-    mask_client_hall = (
-        (df['buyer_department'] == 'КЛИЕНТСКИЙ ЗАЛ') & 
-        (df['buyer_name'].isna() | (df['buyer_name'] == ''))
-    )
-    count_client_hall = mask_client_hall.sum()
-    df.loc[mask_client_hall, 'buyer_name'] = 'КЛИЕНТСКИЙ ЗАЛ'
-    
-    # Затем заполняем остальные пропуски
-    mask_other = df['buyer_name'].isna() | (df['buyer_name'] == '')
-    count_other = mask_other.sum()
-    df.loc[mask_other, 'buyer_name'] = 'Не определен'
-    
-    # статистика
-    if count_client_hall > 0:
-        print(f" Заполнено 'КЛИЕНТСКИЙ ЗАЛ': {count_client_hall} записей")
-    if count_other > 0:
-        print(f" Заполнено 'Не определен': {count_other} записей")
-    if count_client_hall == 0 and count_other == 0:
-        print(" Пропусков в buyer_name не найдено")
-    
-    return df
-
-
 
 def enrich_data(df):
     """Добавляем аналитические колонки"""
+    global PROCESSING_STATS
 
     # Преобразуем даты
     df['creation_date'] = pd.to_datetime(df['creation_date'], errors='coerce')
     df['checkin_date'] = pd.to_datetime(df['checkin_date'], errors='coerce')
 
-        # Конвертация валют в рубли
+    # Конвертация валют в рубли
     print("💱 Конвертация валют в рубли...")
     rates_df = get_currency_rates()
     if rates_df is not None:
         df['amount_rub'] = df.apply(lambda row: convert_to_rub(row, rates_df), axis=1)
+        PROCESSING_STATS['converted_currency'] = (df['amount_rub'] > 0).sum()
         print(f"✅ Конвертация завершена для {len(df)} записей")
     else:
         print("⚠️ Курсы валют не загружены, пропускаем конвертацию")
-        df['amount_rub'] = df['amount_to_pay']  # Используем исходные суммы
+        df['amount_rub'] = df['amount_to_pay']
 
-     # Аналитические колонки
+    # Аналитические колонки
     if 'payment' in df.columns and 'amount_to_pay' in df.columns:
         df['payment_percentage'] = (df['payment'] / df['amount_to_pay'] * 100).round(2)
         # Защита от деления на ноль
@@ -446,10 +390,8 @@ def enrich_data(df):
         df['days_until_checkin'] = df['days_until_checkin'].fillna(0)
 
     if 'country' in df.columns:
-        cruise_agents = df.loc[
-        df['country'].astype(str).str.lower().str.contains('[кk]руиз', regex=True, na=False), 
-        'buyer_name'
-        ].unique()
+        cruise_mask = df['country'].astype(str).str.lower().str.contains('[кk]руиз', regex=True, na=False)
+        cruise_agents = df.loc[cruise_mask, 'buyer_name'].unique()
         df['is_cruise_seller'] = df['buyer_name'].apply(lambda x: 1 if x in cruise_agents else 0)
 
     if 'creation_date' in df.columns:
@@ -458,9 +400,9 @@ def enrich_data(df):
     # Извлекаем регион
     if 'buyer_name' in df.columns:
         df['region'] = df['buyer_name'].apply(extract_region)
+        PROCESSING_STATS['extracted_regions'] = df['buyer_name'].nunique()
 
     return df
-
 
 
 def upload_to_sheets(df, credentials_file='/home/vulcan4ik/dashboard-cruise-app/credentials.json', spreadsheet_name=None):
@@ -555,10 +497,27 @@ def save_data_locally(df):
         raise
 
 
-# Функция для полного пайплайна
+def convert_stats_to_json_serializable(stats):
+    """Конвертирует numpy типы в обычные Python типы для JSON"""
+    import numpy as np
+
+    result = {}
+    for key, value in stats.items():
+        if isinstance(value, (np.integer, np.int64, np.int32)):
+            result[key] = int(value)
+        elif isinstance(value, (np.floating, np.float64, np.float32)):
+            result[key] = float(value)
+        elif isinstance(value, list):
+            result[key] = value
+        else:
+            result[key] = value
+    return result
+
+
 def process_and_upload(file_path, credentials_file='/home/vulcan4ik/dashboard-cruise-app/credentials.json'):
     """
     Полный пайплайн обработки и загрузки данных
+    Возвращает: (df, filename, stats)
     """
     print("\n" + "="*50)
     print("🚀 НАЧАЛО ОБРАБОТКИ ДАННЫХ")
@@ -578,5 +537,12 @@ def process_and_upload(file_path, credentials_file='/home/vulcan4ik/dashboard-cr
     print("✅ ОБРАБОТКА ЗАВЕРШЕНА")
     print("="*50 + "\n")
 
-    return processed_df, csv_filename
+    # Конвертируем stats в JSON-совместимый формат
+    stats_clean = convert_stats_to_json_serializable(PROCESSING_STATS)
+
+    print(f"📊 Финальная статистика (очищенная): {stats_clean}")
+
+    # Возвращаем данные + статистику
+    return processed_df, csv_filename, stats_clean
+
 
