@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Успешная загрузка</title>
+    <title>Обработка завершена - Cruise Analytics</title>
     <style>
         * {
             margin: 0;
@@ -13,260 +13,414 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
         }
 
         .container {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            padding: 50px;
-            max-width: 700px;
-            width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            margin: 20px auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
             text-align: center;
+            color: white;
+            border-radius: 20px 20px 0 0;
         }
 
         .success-icon {
-            font-size: 5em;
-            color: #28a745;
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
-            animation: bounce 1s ease-in-out;
         }
 
-        @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {
-                transform: translateY(0);
-            }
-            40% {
-                transform: translateY(-10px);
-            }
-            60% {
-                transform: translateY(-5px);
-            }
+        .success-icon::after {
+            content: "✓";
+            color: #10b981;
+            font-size: 40px;
+            font-weight: bold;
         }
 
-        h1 {
-            color: #333;
-            font-size: 2.2em;
-            margin-bottom: 15px;
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
         }
 
-        .message {
-            color: #666;
-            font-size: 1.2em;
-            margin-bottom: 30px;
+        .download-btn {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 15px 35px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .main-content h2 {
+            color: #1f2937;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+        }
+
+        .step {
+            margin-bottom: 25px;
+        }
+
+        .step h3 {
+            color: #1f2937;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .step p {
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .step ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+
+        .step li {
+            padding: 5px 0 5px 20px;
+            position: relative;
+            color: #4b5563;
             line-height: 1.6;
         }
 
-        .flash-messages {
-            background: #e7f3ff;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-            text-align: left;
-        }
-
-        .flash-messages p {
-            color: #333;
-            margin: 8px 0;
-            font-size: 1em;
-        }
-
-        .download-section {
-            background: #f0f8ff;
-            border: 2px solid #28a745;
-            border-radius: 12px;
-            padding: 25px;
-            margin: 30px 0;
-        }
-
-        .download-section h2 {
-            color: #28a745;
-            font-size: 1.4em;
-            margin-bottom: 15px;
-        }
-
-        .download-section p {
-            color: #555;
-            font-size: 1em;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-
-        .btn {
-            padding: 15px 35px;
-            border: none;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            display: inline-block;
-        }
-
-        .btn-download {
-            background: #28a745;
-            color: white;
-            font-size: 20px;
-            padding: 18px 40px;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-        }
-
-        .btn-download:hover {
-            background: #218838;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
-        }
-
-        .info-section {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 25px;
-            margin-top: 30px;
-            text-align: left;
-        }
-
-        .info-section h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .step-list {
-            list-style: none;
-            padding: 0;
-            counter-reset: step-counter;
-        }
-
-        .step-list li {
-            color: #555;
-            padding: 12px 0 12px 40px;
-            border-bottom: 1px solid #e0e0e0;
-            font-size: 1em;
-            position: relative;
-            counter-increment: step-counter;
-        }
-
-        .step-list li:before {
-            content: counter(step-counter);
+        .step li::before {
+            content: "•";
             position: absolute;
             left: 0;
-            top: 12px;
-            background: #667eea;
-            color: white;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: #667eea;
             font-weight: bold;
-            font-size: 0.9em;
         }
 
-        .step-list li:last-child {
-            border-bottom: none;
-        }
-
-        .highlight {
-            background: #fff3cd;
-            padding: 2px 6px;
-            border-radius: 3px;
+        .highlight-box {
+            background: #ecfdf5;
+            border: 2px solid #10b981;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            color: #047857;
             font-weight: 600;
+            text-align: center;
         }
 
+        .report-toggle {
+            background: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            padding: 15px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            margin: 30px 0 0 0;
+            transition: all 0.3s;
+            font-weight: 600;
+            color: #374151;
+        }
 
+        .report-toggle:hover {
+            background: #e5e7eb;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .report-toggle::after {
+            content: " ▼";
+            font-size: 0.8em;
+        }
+
+        .report-toggle.open::after {
+            content: " ▲";
+        }
+
+        .report-content {
+            display: none;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 30px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .report-content.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-card.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .stat-card.success {
+            border-left-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .stat-value.removed {
+            color: #dc2626;
+        }
+
+        .stat-value.success {
+            color: #10b981;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            color: #92400e;
+            margin-top: 15px;
+        }
+
+        .back-btn {
+            display: block;
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+            text-decoration: none;
+            border-top: 1px solid #e5e7eb;
+            transition: color 0.3s;
+        }
+
+        .back-btn:hover {
+            color: #667eea;
+        }
+
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div class="success-icon">✓</div>
-        <h1>Данные успешно обработаны!</h1>
-        <p class="message">Файл готов к скачиванию и загрузке в DataLens</p>
-
-        <!-- Показываем сообщения от Flask -->
-        {% with messages = get_flashed_messages() %}
-        {% if messages %}
-        <div class="flash-messages">
-            {% for message in messages %}
-            <p>{{ message }}</p>
-            {% endfor %}
+        <div class="header">
+            <div class="success-icon"></div>
+            <h1>✅ Файл готов к скачиванию!</h1>
+            <p>Данные обработаны и готовы для загрузки в DataLens</p>
+            {% if filename %}
+            <a href="{{ url_for('download_file', filename=filename) }}" class="download-btn">
+                💾 Скачать CSV файл
+            </a>
+            {% endif %}
         </div>
-        {% endif %}
-        {% endwith %}
 
+        <div class="main-content">
+            <h2>🚀 Следующие шаги</h2>
 
-        <!-- Блок скачивания -->
-        <div class="download-section">
-            <h2>📥 Скачайте обработанный файл</h2>
-            <p>Файл готов для загрузки в Yandex DataLens. Нажмите кнопку ниже чтобы скачать CSV файл.</p>
+            <div class="step">
+                <h3>1. Скачайте обработанный файл</h3>
+                <p>Нажмите "Скачать CSV файл" выше — это уже очищенные, готовые к анализу данные.</p>
+            </div>
 
-            <div class="button-group">
-                {% if filename %}
-                <a href="{{ url_for('download_file', filename=filename) }}"
-                   class="btn btn-download">
-                    💾 Скачать CSV файл
-                </a>
-                {% else %}
-                <div style="color: red; padding: 15px; background: #ffe0e0; border-radius: 8px;">
-                    ❌ ОШИБКА: Параметр filename не передан!
+            <div class="step">
+                <h3>2. Обновите подключение в DataLens</h3>
+                <ul>
+                    <li>Откройте <a href="https://datalens.yandex.ru/" target="_blank">Yandex DataLens</a></li>
+                    <li>В разделе "Подключения" выберите свой файл</li>
+                    <li>"..." → "Заменить" → загрузить новый CSV → "Сохранить изменения"</li>
+                </ul>
+                <div class="highlight-box">
+                    ✨ Дашборд обновится автоматически!
+                </div>
+            </div>
+
+            <div class="step">
+                <h3>3. Проверьте датасет</h3>
+                <p>Убедитесь, что все поля отображаются корректно. Если есть ошибки — обновите страницу (F5).</p>
+            </div>
+
+            <div class="step">
+                <h3>4. Используйте готовый дашборд</h3>
+                <ul>
+                    <li>Динамика продаж — отслеживайте изменения по периодам</li>
+                    <li>Топ-10 агентств — анализируйте лидеров по объему продаж</li>
+                    <li>Фильтры/селекторы — выбирайте период, регион, тип продукта</li>
+                    <li>Детальная аналитика — просматривайте информацию по каждому агенту и менеджеру</li>
+                </ul>
+            </div>
+
+            {% if stats and stats.original_rows %}
+            <div class="report-toggle" onclick="toggleReport()">
+                📊 Показать детальный отчет об обработке
+            </div>
+
+            <div class="report-content" id="reportContent">
+                <h3 style="color: #1f2937; margin-bottom: 20px; text-align: center;">📈 Отчет об обработке данных</h3>
+
+                <h4 style="color: #374151; margin-bottom: 15px; font-size: 1em;">Исходный файл</h4>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Загружено строк</div>
+                        <div class="stat-value">{{ stats.original_rows }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Загружено столбцов</div>
+                        <div class="stat-value">{{ stats.original_cols }}</div>
+                    </div>
+                </div>
+
+                <h4 style="color: #374151; margin: 20px 0 15px; font-size: 1em;">Обработка</h4>
+                <div class="stats-grid">
+                    {% if stats.removed_cancelled > 0 %}
+                    <div class="stat-card warning">
+                        <div class="stat-label">Удалено аннулированных</div>
+                        <div class="stat-value removed">{{ stats.removed_cancelled }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if stats.removed_empty_voucher > 0 %}
+                    <div class="stat-card warning">
+                        <div class="stat-label">Удалено с пустым "Путевка"</div>
+                        <div class="stat-value removed">{{ stats.removed_empty_voucher }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if stats.filled_buyer_name_client_hall > 0 or stats.filled_buyer_name_undefined > 0 %}
+                    <div class="stat-card">
+                        <div class="stat-label">Заполнено в "Покупатель"</div>
+                        <div class="stat-value">{{ stats.filled_buyer_name_client_hall +
+                            stats.filled_buyer_name_undefined }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if stats.converted_currency > 0 %}
+                    <div class="stat-card">
+                        <div class="stat-label">Конвертировано в ₽</div>
+                        <div class="stat-value">{{ stats.converted_currency }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <h4 style="color: #374151; margin: 20px 0 15px; font-size: 1em;">Итоговый результат</h4>
+                <div class="stats-grid">
+                    <div class="stat-card success">
+                        <div class="stat-label">Сохранено строк</div>
+                        <div class="stat-value success">{{ stats.final_rows }}</div>
+                    </div>
+                    <div
+                        class="stat-card {% if ((stats.original_rows - stats.final_rows) / stats.original_rows * 100) > 10 %}warning{% endif %}">
+                        <div class="stat-label">Потеряно строк</div>
+                        <div class="stat-value">
+                            {{ stats.original_rows - stats.final_rows }}
+                            ({{ "%.1f"|format((stats.original_rows - stats.final_rows) / stats.original_rows * 100) }}%)
+                        </div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-label">Сохранено столбцов</div>
+                        <div class="stat-value">{{ stats.final_cols }}</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-label">Добавлено полей</div>
+                        <div class="stat-value">+{{ stats.final_cols - stats.original_cols }}</div>
+                    </div>
+                </div>
+
+                {% if (stats.original_rows - stats.final_rows) / stats.original_rows * 100 > 10 %}
+                <div class="warning-box">
+                    ⚠️ <strong>Внимание:</strong> Удалено более 10% строк. Проверьте исходные данные.
                 </div>
                 {% endif %}
+
+                <div class="highlight-box" style="margin-top: 15px;">
+                    ✅ Данные готовы к анализу
+                </div>
             </div>
+            {% endif %}
         </div>
 
-        <!-- Кнопка для нового отчета -->
-        <div class="button-group">
-            <a href="/" class="btn btn-secondary">
-                🔄 Загрузить новый отчет
-            </a>
-        </div>
-
-        <!-- Инструкция -->
-        <div class="info-section">
-            <h3>
-                <span>📋</span>
-                <span>Следующие шаги</span>
-            </h3>
-            <ol class="step-list">
-                <li>Нажмите кнопку <span class="highlight">"Скачать CSV файл"</span> выше</li>
-                <li>Откройте <a href="https://datalens.yandex.ru" target="_blank" style="color: #667eea;">Yandex DataLens</a></li>
-                <li>Создайте новое подключение типа <span class="highlight">"Файлы"</span></li>
-                <li>Загрузите скачанный CSV файл в DataLens</li>
-                <li>Создайте датасет и постройте дашборд с визуализациями</li>
-            </ol>
-        </div>
+        <a href="{{ url_for('index') }}" class="back-btn">← Вернуться на главную</a>
     </div>
+
+    <script>
+        function toggleReport() {
+            var content = document.getElementById('reportContent');
+            var toggle = document.querySelector('.report-toggle');
+
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                toggle.classList.remove('open');
+                toggle.innerHTML = '📊 Показать детальный отчет об обработке';
+            } else {
+                content.classList.add('show');
+                toggle.classList.add('open');
+                toggle.innerHTML = '📊 Скрыть детальный отчет';
+            }
+        }
+    </script>
 </body>
 
 </html>
