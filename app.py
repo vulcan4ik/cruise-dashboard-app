@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, send_file
+from flask import Flask, request, render_template, redirect, url_for, flash, send_file, session
 import os
 from werkzeug.utils import secure_filename
 import processsing
@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
+app.secret_key = 'your-secret-key-here-change-me-to-random-string-12345'  # ВАЖНО: поменяйте на случайную строку
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.config['RESULTS_FOLDER'] = '/home/vulcan4ik/dashboard-cruise-app/results'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
@@ -43,7 +43,8 @@ def get_currency_status():
         total_records = len(rates_df)
 
         # Проверяем актуальность
-        today = datetime.now()
+        today = pd.Timestamp.now().normalize()
+        max_date = pd.Timestamp(max_date).normalize()
         days_old = (today - max_date).days
 
         if days_old <= 2:
@@ -67,6 +68,7 @@ def get_currency_status():
         }
 
     except Exception as e:
+        print(f"❌ Ошибка получения статуса курсов: {str(e)}")
         return {
             'status': 'error',
             'message': f'Ошибка: {str(e)}',
@@ -75,7 +77,7 @@ def get_currency_status():
 
 @app.route('/')
 def index():
-    # Получаем статус курсов валют
+    """Главная страница"""
     currency_info = get_currency_status()
     return render_template('index.html', currency_info=currency_info)
 
@@ -109,6 +111,7 @@ def download_file(filename):
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
+    """Загрузка и обработка файла"""
     if request.method == 'GET':
         return redirect('/')
 
@@ -132,22 +135,25 @@ def upload_file():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-
         print(f"📂 Файл сохранён: {filepath}")
 
-        # Обрабатываем данные - ВАЖНО: получаем ДВА значения
-        df_processed, result_filename = processsing.process_and_upload(filepath)
+        # Обрабатываем данные (ИСПРАВЛЕНО: принимаем 3 значения)
+        df_processed, result_filename, stats = processsing.process_and_upload(filepath)
 
         print(f"✅ Обработка завершена")
         print(f"📊 Обработано строк: {len(df_processed)}")
         print(f"📁 Имя файла результата: {result_filename}")
+        print(f"📊 Статистика: {stats}")
 
         flash('✅ Данные успешно обработаны!')
         flash(f'📊 Обработано строк: {len(df_processed)}')
         flash(f'💱 Конвертация валют выполнена')
         flash(f'📥 CSV файл готов к загрузке в DataLens')
 
-        # КРИТИЧЕСКИ ВАЖНО: передаем filename через GET параметр
+        # Сохраняем статистику в session
+        session['processing_stats'] = stats
+        print(f"💾 Stats сохранены в session: {stats}")
+
         print(f"🔗 Редирект на success с filename={result_filename}")
         return redirect(url_for('success', filename=result_filename))
 
@@ -159,7 +165,7 @@ def upload_file():
         return redirect(url_for('index'))
 
     finally:
-        # УДАЛЯЕМ ФАЙЛ ПОСЛЕ ОБРАБОТКИ
+        # Удаляем загруженный файл после обработки
         if filepath and os.path.exists(filepath):
             try:
                 os.remove(filepath)
@@ -169,10 +175,20 @@ def upload_file():
 
 @app.route('/success')
 def success():
-    # Получаем filename из GET параметров
+    """Страница успешной обработки"""
     filename = request.args.get('filename')
+    stats = session.get('processing_stats', {})
+
     print(f"📄 Success page - получен filename: {filename}")
-    return render_template('success.html', filename=filename)
+    print(f"📊 Stats получены из session: {stats}")
+    print(f"📊 original_rows: {stats.get('original_rows', 'Нет данных')}")
+
+    if not filename:
+        flash('Файл не найден')
+        return redirect(url_for('index'))
+
+    return render_template('success.html', filename=filename, stats=stats)
 
 if __name__ == '__main__':
     app.run(debug=True)
+
