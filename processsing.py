@@ -35,6 +35,7 @@ def reset_stats():
 
 
 def get_currency_rates(rates_file='/home/vulcan4ik/dashboard-cruise-app/app_data/currency_rates_2024-2025.csv'):
+
     """Загружает курсы валют с кэшированием"""
     global _CURRENCY_RATES_CACHE
 
@@ -42,11 +43,16 @@ def get_currency_rates(rates_file='/home/vulcan4ik/dashboard-cruise-app/app_data
         return _CURRENCY_RATES_CACHE
 
     try:
+        # ← ДОБАВИТЬ ЭТУ ПРОВЕРКУ:
+        if not os.path.exists(rates_file):
+            print(f"❌ Файл курсов не найден: {rates_file}")
+            return None
+
         rates_df = pd.read_csv(rates_file)
         rates_df['date'] = pd.to_datetime(rates_df['date'])
         _CURRENCY_RATES_CACHE = rates_df
         print(f"✅ Курсы валют загружены: {len(rates_df)} записей")
-        print(f"📅 Период курсов: {rates_df['date'].min()} - {rates_df['date'].max()}")
+        print(f"📅 Период курсов: {rates_df['date'].min().date()} - {rates_df['date'].max().date()}")
         return rates_df
     except Exception as e:
         print(f"❌ Ошибка загрузки курсов валют: {e}")
@@ -55,6 +61,7 @@ def get_currency_rates(rates_file='/home/vulcan4ik/dashboard-cruise-app/app_data
 
 def convert_to_rub(row, rates_df):
     """Конвертирует сумму в рубли с учетом курса ЦБ + 4.5%"""
+    global PROCESSING_STATS
 
     # Проверка наличия суммы
     if pd.isna(row.get('amount_to_pay')) or row['amount_to_pay'] in [0, '', None]:
@@ -101,10 +108,11 @@ def convert_to_rub(row, rates_df):
             # Берем последний доступный курс до даты создания
             rate_row = available_dates.iloc[-1]
 
-        if target_currency in rate_row:
+        if target_currency in rate_row.index and pd.notna(rate_row[target_currency]):
             rate = float(rate_row[target_currency])
             # Курс ЦБ + 4.5% наценка
             converted_amount = (amount * rate) * 1.045
+            PROCESSING_STATS['converted_currency'] += 1
             return round(converted_amount, 2)
         else:
             print(f"❌ Валюта {target_currency} не найдена в курсах")
@@ -361,47 +369,70 @@ def extract_region(agency_name):
 
 
 def enrich_data(df):
-    """Добавляем аналитические колонки"""
+
     global PROCESSING_STATS
 
-    # Преобразуем даты
-    df['creation_date'] = pd.to_datetime(df['creation_date'], errors='coerce')
-    df['checkin_date'] = pd.to_datetime(df['checkin_date'], errors='coerce')
+    print(f"🔄 Начало обогащения данных...")
 
-    # Конвертация валют в рубли
-    print("💱 Конвертация валют в рубли...")
-    rates_df = get_currency_rates()
-    if rates_df is not None:
-        df['amount_rub'] = df.apply(lambda row: convert_to_rub(row, rates_df), axis=1)
-        PROCESSING_STATS['converted_currency'] = (df['amount_rub'] > 0).sum()
-        print(f"✅ Конвертация завершена для {len(df)} записей")
-    else:
-        print("⚠️ Курсы валют не загружены, пропускаем конвертацию")
-        df['amount_rub'] = df['amount_to_pay']
 
-    # Аналитические колонки
-    if 'payment' in df.columns and 'amount_to_pay' in df.columns:
-        df['payment_percentage'] = (df['payment'] / df['amount_to_pay'] * 100).round(2)
-        # Защита от деления на ноль
-        df['payment_percentage'] = df['payment_percentage'].replace([np.inf, -np.inf], 0)
-
-    if 'checkin_date' in df.columns and 'creation_date' in df.columns:
-        df['days_until_checkin'] = (df['checkin_date'] - df['creation_date']).dt.days
-        df['days_until_checkin'] = df['days_until_checkin'].fillna(0)
-
-    if 'country' in df.columns:
-        cruise_mask = df['country'].astype(str).str.lower().str.contains('[кk]руиз', regex=True, na=False)
-        cruise_agents = df.loc[cruise_mask, 'buyer_name'].unique()
-        df['is_cruise_seller'] = df['buyer_name'].apply(lambda x: 1 if x in cruise_agents else 0)
-
+    # Преобразуем даты в datetime формат
     if 'creation_date' in df.columns:
-        df['creation_month'] = df['creation_date'].dt.month
+        df['creation_date'] = pd.to_datetime(df['creation_date'], errors='coerce')
 
-    # Извлекаем регион
-    if 'buyer_name' in df.columns:
-        df['region'] = df['buyer_name'].apply(extract_region)
-        PROCESSING_STATS['extracted_regions'] = df['buyer_name'].nunique()
+    if 'checkin_date' in df.columns:
+        df['checkin_date'] = pd.to_datetime(df['checkin_date'], errors='coerce')
 
+    # Загружаем курсы перед конвертацией
+    rates_df = get_currency_rates()
+
+    if rates_df is None:
+        print(f"⚠️  Курсы валют не загружены, конвертация пропущена")
+        df['amount_rub'] = 0
+    else:
+        # передаём rates_df в функцию
+        print(f"💱 Начало конвертации валют...")
+        df['amount_rub'] = df.apply(
+            lambda row: convert_to_rub(row, rates_df),
+            axis=1
+        )
+        print(f"✅ Конвертировано строк: {PROCESSING_STATS['converted_currency']}")
+
+    # Извлечение региона из страны (если нужно)
+    if 'country' in df.columns:
+        print(f"🌍 Извлечение регионов...")
+        df['region'] = df['country'].apply(extract_region)
+        PROCESSING_STATS['extracted_regions'] = df['region'].notna().sum()
+    else:
+        df['region'] = 'Неизвестно'
+
+    # Проверка, круизная ли путевка
+    df['is_cruise_seller'] = False
+    if 'tour_name' in df.columns:
+        df['is_cruise_seller'] = df['tour_name'].str.contains('круиз|cruise', case=False, na=False)
+
+    # Процент оплаты
+    df['payment_percentage'] = 0.0
+    if 'payment' in df.columns and 'amount_rub' in df.columns:
+        mask = df['amount_rub'] > 0
+        df.loc[mask, 'payment_percentage'] = (
+            (df.loc[mask, 'payment'] / df.loc[mask, 'amount_rub'] * 100).round(2)
+        )
+
+    # Дни до заезда
+    if 'checkin_date' in df.columns:
+        df['checkin_date'] = pd.to_datetime(df['checkin_date'], errors='coerce')
+        df['days_until_checkin'] = (df['checkin_date'] - pd.Timestamp.now()).dt.days
+    else:
+        df['days_until_checkin'] = 0
+
+    # Месяц создания
+    if 'creation_date' in df.columns:
+        df['creation_date'] = pd.to_datetime(df['creation_date'], errors='coerce')
+        df['creation_month'] = df['creation_date'].dt.strftime('%Y-%m')
+    else:
+        df['creation_month'] = 'Неизвестно'
+
+    print(f"✅ Обогащение данных завершено")
     return df
 
 
@@ -544,5 +575,7 @@ def process_and_upload(file_path, credentials_file='/home/vulcan4ik/dashboard-cr
 
     # Возвращаем данные + статистику
     return processed_df, csv_filename, stats_clean
+
+
 
 
