@@ -70,11 +70,13 @@ def convert_to_rub(row, rates_df):
     amount = float(row['amount_to_pay'])
     currency = str(row.get('currency', 'рб')).strip()
 
-    # Маппинг валют
     currency_map = {
-        'E': 'EUR',
+        'E': 'EUR',  # латинская E
+        'Е': 'EUR',  # русская Е
         'EUR': 'EUR',
         '€': 'EUR',
+        'евро': 'EUR',
+        'ЕВРО': 'EUR',
         '$': 'USD',
         'USD': 'USD',
         'рб': 'RUB',
