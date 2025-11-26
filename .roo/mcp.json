@@ -1,0 +1,18 @@
+// {
+//   "mcpServers": {
+//     "context7": {
+//       "type": "streamable-http",
+//       "url": "https://mcp.context7.com/mcp",
+//       "headers": {
+//         "CONTEXT7_API_KEY": "ctx7sk-019dc904-bdec-45ae-a7da-562725b90c42"
+//       }
+//     },
+//     "chrome-devtools": {
+//       "command": "npx",
+//       "args": [
+//         "-y",
+//         "chrome-devtools-mcp@latest"
+//       ]
+//     }
+//   }
+// }
